@@ -1,0 +1,7 @@
+initial_budget:
+  a: 2
+  b: 3
+loss_fn_kwargs:
+  start_date: null
+  end_date: null
+  dim: "time"
