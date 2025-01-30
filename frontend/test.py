@@ -1,7 +1,7 @@
 from enum import StrEnum
 from typing import Set
 from utils.budget_classes import BudgetScenario
-from utils.study_helpers import get_study, list_studies, delete_study, create_budget_scenario
+from utils.study_helpers import get_study, list_studies, delete_study, create_budget_scenario, get_study_settings
 
 import streamlit as st
 from pydantic import BaseModel, Field, model_validator
@@ -13,7 +13,9 @@ import streamlit_pydantic as sp
 import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from time import sleep
+import json
 
 
 st.set_page_config(layout="wide")
@@ -21,8 +23,6 @@ def user_validator():
     return True
 
 st.title("Budget Scenario Planner")
-
-
 
 if "studies" not in st.session_state:
     st.session_state.studies = asyncio.run(list_studies())
@@ -33,17 +33,40 @@ if not user_validator():
 
 
 def wrap_delete_study(study_name):
+    
+    asyncio.run(delete_study(study_name))
     index = st.session_state.studies.index(study_name)
     st.session_state.studies.pop(index)
-    asyncio.run(delete_study(study_name))
-    st.toast(f"{study_name} deleted", type="info")
+    
+    st.toast(f"{study_name} deleted")
+    sleep(5)
 
 def refresh(study_name):
     st.session_state.studies = asyncio.run(list_studies())
 
+def load_file():
+    uploaded_file = st.file_uploader("Choose a file")
+    if uploaded_file is not None:
+        try:
+            return json.load(uploaded_file)
+        except Exception as e:
+            st.error("Error loading file")
+            print("file", e)
+            return None
 
+@st.cache_data
+def convert_study(study):
+    try:
+        budget = [trial.budget|{"Revenue": trial.values[0]} for trial in study.trials if trial.completed]
+        
+        df = pd.DataFrame(data=budget)
+        return df.to_csv().encode('utf-8')
+    except Exception as e:
+        st.error("Error converting study to csv")
+        print("csv", e)
+        return None
 
-@st.fragment(run_every=10)
+@st.fragment(run_every=30)
 def show_study(study_name):
     study = asyncio.run(get_study(study_name))
     if not study:
@@ -52,8 +75,8 @@ def show_study(study_name):
     container = st.container(key=f"{study_name}_container", border=True, height=800)
     container.markdown(f"### {study_name}")
     columns = container.columns(5)
+    
     columns[-1].button("", key=f"{study_name}_delete", type='primary', icon='🗑️', on_click=wrap_delete_study, args=(study_name,))
-       
     columns[-2].button("Refresh", key=f"{study_name}_refresh", on_click=refresh, args=(study_name,), help="Refresh the study")
     best_study = study.best_trial
     best_study = best_study if best_study else "No best trial yet"
@@ -61,7 +84,7 @@ def show_study(study_name):
         container.markdown(f"**{best_study}**")
         return
         
-    tabs = container.tabs(["Best Trial", "Trial History"])
+    tabs = container.tabs(["Best Trial", "Trial History", "Settings"])
     with tabs[0]:
         try:
             st.markdown(
@@ -77,7 +100,8 @@ def show_study(study_name):
                 ax.pie([budget['a'], budget['b']], labels=['Online Video', 'Paid Search'], autopct='%1.1f%%', startangle=90)
                 ax.legend(ncols=2)
                 st.pyplot(fig, clear_figure=True)
-    
+
+            columns[0].download_button('Download', convert_study(study), f'{study_name}_trials.csv', key=f"{study_name}_download", mime='text/csv')
         except Exception as e:
             st.error("Error processing best trial")
 
@@ -102,23 +126,29 @@ def show_study(study_name):
             st.pyplot(fig, clear_figure=True)
         except Exception as e:
             st.error("Error processing trial history")
+    with tabs[2]:
+        ...
+        # try:
+        #     settings = asyncio.run(get_study_settings(study_name))
+        #     st.write(settings)
+        # except Exception as e:
+        #     st.error("Error processing settings")
        
-
-    
-
 
 
 @st.dialog("Create Budget Scenario")
 def _create_budget_scenario():
+    file = load_file()
     data = sp.pydantic_form(key="Budget Scenario", model=BudgetScenario)
-    if data:
+    if data or file:
+        if file:
+            data = BudgetScenario(**file)
         asyncio.run(create_budget_scenario(data))
         st.session_state.studies.append(data.name)
-        st.toast(f"{data.name} created", type="info")
+        st.toast(f"{data.name} created")
         sleep(1)
         st.rerun()
         
-
 
 if st.button("Create Budget Scenario"):
     _create_budget_scenario()

@@ -64,7 +64,31 @@ async def get_study(study_name:str, url: str = URL) -> Study:
         return None
     
     return process_study(response.json())
+
+async def get_study_settings(study_name:str, url: str = URL) -> Study:
+
+    formated_url = f"{url}/{study_name}/settings"
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(formated_url)
+        response.raise_for_status()
+    except httpx.RequestError as exc:
+        print(f"A request error occurred: {exc}")
+        return None
+    except httpx.TimeoutException as exc:
+        print(f"A timeout error occurred: {exc}")
+        return None
+    except httpx.HTTPStatusError as exc:
+        print(f"A HTTP status error occurred: {exc}")
+        if exc.response.status_code == 404:
+            print(f"Study {study_name} not found")
+        return None
+    except httpx.HTTPError as exc:
+        print(f"An error occurred: {exc}")
+        return None
     
+    return (response.json())
+   
 async def list_studies(url: str = URL) -> list[str]:
     try:
         async with httpx.AsyncClient() as client:

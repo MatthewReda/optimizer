@@ -1,0 +1,20 @@
+{
+    "name": "Test File",
+    "Online Video": {
+        "unit": "$K",
+        "lower_bound": 2,
+        "upper_bound": 8
+    },
+    "Paid Search": {
+        "unit": "$K",
+        "lower_bound": 2,
+        "upper_bound": 8
+    },
+    "Total Budget": {
+        "unit": "$K",
+        "lower_bound": 10,
+        "upper_bound": 10
+    },
+    "timout": 10,
+    "n_trials": 500
+}
