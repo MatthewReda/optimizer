@@ -10,11 +10,21 @@ import multiprocessing as mp
 import optuna
 from pathlib import Path
 import traceback
+from fastapi.middleware.cors import CORSMiddleware
 # from sqlmodel import Field, Session, SQLModel, create_engine, select, Relationship
 # from typing import Annotated, Optional, List, Mapping
 
-
+origins = ['http://localhost:3000', 'http://localhost:8080']
 app = fastapi.FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 SECONDS_IN_MINUTE = 60
 
@@ -141,7 +151,11 @@ async def get_budget_scenarios():
     """
     Get all budget scenarios
     """
-    return {"budget_scenarios": optuna.study.get_all_study_names(storage=app.state.database_url)}
+    try:
+
+        return {"budget_scenarios": optuna.study.get_all_study_names(storage=app.state.database_url)}
+    except Exception as e:
+        return {"budget_scenarios": []}
 
 @app.get("/budget_scenario/{name}")
 async def get_budget_scenario(name: str):

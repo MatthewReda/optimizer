@@ -154,7 +154,8 @@ if st.button("Create Budget Scenario"):
     _create_budget_scenario()
 
 columns = st.columns(2)
-for i, study_name in enumerate(st.session_state.studies):
-    with columns[i % 2]:
-        show_study(study_name)
+if st.session_state.studies:
+    for i, study_name in enumerate(st.session_state.studies):
+        with columns[i % 2]:
+            show_study(study_name)
     
