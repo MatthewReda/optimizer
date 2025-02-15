@@ -21,7 +21,8 @@ def make_radar_chart(initial_budget:Budget, optimized_budget:Budget) -> go.Figur
         name='Initial Budget',
         hovertemplate="Channel: %{theta}<br>Percentage: %{r:.1f}%<br>Budget: $%{text}",
         text=[f"{budget*initial_total_budget/100:.2f}" for budget in initial_r],
-         marker={'color': color_to_hex((80, 160, 75))}
+        marker={'color': "#F3578E"},
+         
     ))
     fig.add_trace(go.Scatterpolar(
         r=optimal_r,
@@ -30,7 +31,7 @@ def make_radar_chart(initial_budget:Budget, optimized_budget:Budget) -> go.Figur
         name='Optimized Budget',
         hovertemplate="Channel: %{theta}<br>Percentage: %{r:.1f}%<br>Budget: $%{text}",
         text=[f"{budget*initial_total_budget/100:.2f}" for budget in optimal_r],
-        marker={'color': color_to_hex((230, 100, 150))},
+        marker={'color': "#57F3BC"}
     ))
     #fig.update_layout(hovermode='theta unified')
     
@@ -42,7 +43,6 @@ def make_radar_chart(initial_budget:Budget, optimized_budget:Budget) -> go.Figur
             range=[0, 1.2*max(initial_r+optimal_r)]
             )),
         showlegend=True,
-   
     )
 
     return fig

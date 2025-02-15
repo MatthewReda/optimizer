@@ -24,7 +24,8 @@ from time import sleep
 import json
 
 
-st.set_page_config(layout="wide")
+st.set_page_config(layout="wide", page_title="Budget Scenario Optimizer")
+
 def user_validator():
     return True
 
@@ -84,46 +85,48 @@ def convert_study(study):
 
 @st.cache_data
 def trial_view(
-    best_study: Trial, 
+    best_study: Trial|None, 
     initial_budget: dict[str, float], 
     prediction_with_zero_budget: float, 
     prediction_with_initial_budget: float
     ):
     """Initial Optimizer Overview"""
-
+    try:
     ## Format Summary
-    cols = st.columns(3)
+        cols = st.columns(3)
 
-    optimal_incremental_revenue = best_study.values[0] - prediction_with_zero_budget
-    initial_incremental_revenue = prediction_with_initial_budget - prediction_with_zero_budget
+        optimal_incremental_revenue = best_study.values[0] - prediction_with_zero_budget
+        initial_incremental_revenue = prediction_with_initial_budget - prediction_with_zero_budget
 
-    total_optimal_budget = sum(best_study.budget.values())
-    total_initial_budget = sum(initial_budget.values())
+        total_optimal_budget = sum(best_study.budget.values())
+        total_initial_budget = sum(initial_budget.values())
 
-    initial_roi = initial_incremental_revenue/total_initial_budget
-    optimal_roi = optimal_incremental_revenue/total_optimal_budget
+        initial_roi = initial_incremental_revenue/total_initial_budget
+        optimal_roi = optimal_incremental_revenue/total_optimal_budget
 
-    cols[0].metric(
-        label="Total Budget",
-        value=f"${total_optimal_budget:0.2f}",
-        delta=f"${total_optimal_budget-total_initial_budget:0.2f}",
-        border=True
-    )
-
-    cols[1].metric(
-        label="Inc Revenue", 
-        value=f"${optimal_incremental_revenue:0.2f}", 
-        delta=f"${optimal_incremental_revenue-initial_incremental_revenue:0.2f}",
-        border=True
+        cols[0].metric(
+            label="Total Budget",
+            value=f"${total_optimal_budget:0.2f}",
+            delta=f"${total_optimal_budget-total_initial_budget:0.2f}",
+            border=True
         )
 
-    cols[2].metric(
-        label="ROI",
-        value=f"${optimal_roi:.2f}",
-        delta=f"{optimal_roi/initial_roi-1: .1%}",
-        border=True
+        cols[1].metric(
+            label="Inc Revenue", 
+            value=f"${optimal_incremental_revenue:0.2f}", 
+            delta=f"${optimal_incremental_revenue-initial_incremental_revenue:0.2f}",
+            border=True
+            )
 
-    )
+        cols[2].metric(
+            label="ROI",
+            value=f"${optimal_roi:.2f}",
+            delta=f"{optimal_roi/initial_roi-1: .1%}",
+            border=True
+
+        )
+    except TypeError:
+        ...
 
 @st.fragment(run_every=30)
 def show_study(study_name):
@@ -134,36 +137,49 @@ def show_study(study_name):
         return
     container = st.container(key=f"{study_name}_container", border=True, height=800)
     container.markdown(f"### {study_name}")
-    columns = container.columns(5)
+    
+    ## Handle study initial settings
     study_settings = asyncio.run(get_study_settings(study_name))
     study_settings = study_settings if study_settings else {}
     if study_settings:
         initial_budget = {channel_setting['channel']: channel_setting['initial_budget'] for channel_setting in study_settings['channel_settings']}
+        
+        ## Predict revenue produced by original budget
         initial_prediction = predict(initial_budget)
-        #print(initial_prediction)
-        zero_prediction = predict({name: 0 for name in initial_budget.keys()})
-        initial_budget = {name: initial_budget[name.lower().replace(" ","_")] for name in ACCEPTED_CHANNELS}
-    
-    columns[-1].button("Delete", key=f"{study_name}_delete", type='primary', on_click=wrap_delete_study, args=(study_name,))
-    columns[-2].button("Refresh", key=f"{study_name}_refresh", on_click=refresh, args=(study_name,), help="Refresh the study")
-    best_study = study.best_trial
 
+        ## Predict base revenue
+        zero_prediction = predict({name: 0 for name in initial_budget.keys()})
+
+        ## Reformat budget to use human friendly names
+        initial_budget = {name: initial_budget[name.lower().replace(" ","_")] for name in ACCEPTED_CHANNELS}
+
+    ## Handle best trial
+    best_study = study.best_trial
     best_study = best_study if best_study else "No best trial yet"
     if isinstance(best_study, str):
         container.markdown(f"**{best_study}**")
         return
-        
-    tabs = container.tabs(["Best Trial", "Trial History", "Settings"])
-    with tabs[0]:
-        try:
-           
-            trial_view(
+    
+    ## Display trial metrics TOTAL_BUDGET INC_REVENUE ROIS
+    with container:    
+        trial_view(
                 best_study, 
                 initial_budget=initial_budget, 
                 prediction_with_initial_budget=initial_prediction, 
                 prediction_with_zero_budget=zero_prediction
             )
 
+    ## Button row
+    columns = container.columns(5)
+    columns[-1].button("Delete", key=f"{study_name}_delete", type='primary', on_click=wrap_delete_study, args=(study_name,))
+    columns[-2].button("Refresh", key=f"{study_name}_refresh", on_click=refresh, args=(study_name,), help="Refresh the study")
+    
+    ## Additional study information
+    tabs = container.tabs(["Best Trial", "Trial History", "Settings"])
+    with tabs[0]:
+        ## Display radar chart to compare budget allocations
+        try:
+        
             if budget := best_study.budget:
                 pyplot = make_radar_chart(initial_budget, budget)
                 st.plotly_chart(pyplot, use_container_width=True)
@@ -173,45 +189,9 @@ def show_study(study_name):
             st.error("Error processing best trial")
 
     with tabs[1]:
+        ## Optimizer history for 
         try:
             revenue = [trial.values[0] for trial in study.trials if trial.completed]
-
-            # best_studys = []
-            # best_so_far = 0
-            # for trial in study.trials:
-            #     if not trial.completed:
-            #         continue
-            #     if trial.values[0] > best_so_far:
-            #         best_so_far = trial.values[0]
-            #     best_studys.append(best_so_far)
-
-            # index = np.arange(len(revenue))
-            
-            # fig = go.Figure()
-
-            # fig.add_trace(
-            #     go.Scatter(
-            #         x=index,
-            #         y=revenue,
-            #         mode="markers",
-            #         hovertemplate="Predicted Revenue: $%{y:.0f}",
-            #         name="Trial",
-            #     )
-            # )
-            # fig.add_trace(
-            #     go.Scatter(
-            #         x=index,
-            #         y=best_studys,
-            #         hovertemplate="Predicted Revenue: $%{y:.0f}",
-            #         mode='lines',
-            #         name="Best Value"
-            #     )
-            # )
-            # fig.update_layout(
-            #     title="Trial Progress",
-            #     hovermode="x unified",
-                
-            # )
             fig = make_trial_history_figure(revenue=revenue)
             st.plotly_chart(fig, use_container_width=True)
 
@@ -234,10 +214,12 @@ def show_study(study_name):
             })
         except Exception as e:
             st.error("Error processing settings")
-       
+
+    
+    
 
 
-@st.dialog("Create Budget Scenario")
+@st.dialog("Create Budget Scenario", width='large')
 def _create_budget_scenario():
     file = load_file()
     data = sp.pydantic_form(key="Budget Scenario", model=BudgetScenario)
@@ -253,6 +235,7 @@ def _create_budget_scenario():
 
 if st.button("Create Budget Scenario"):
     _create_budget_scenario()
+
 
 columns = st.columns(2)
 if st.session_state.studies:
