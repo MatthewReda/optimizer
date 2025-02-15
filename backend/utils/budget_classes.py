@@ -10,12 +10,14 @@ class Unit(StrEnum):
 
 class BudgetRange(BaseModel):
     unit: Unit = Field(Unit.THOUSAND, description="The unit of the budget range.")
-
+    initial_budget: float = Field(
+        ..., description="The initial budget for this channel.", ge=0
+    )
     lower_bound: float = Field(
-        ..., description="The lower bound of the budget range for this channel."
+        ..., description="The lower bound of the budget range for this channel.", ge=0
     )
     upper_bound: float = Field(
-        ..., description="The upper bound of the budget range for this channel."
+        ..., description="The upper bound of the budget range for this channel.", ge=0
     )
 
     @model_validator(mode='after')

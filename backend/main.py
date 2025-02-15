@@ -1,4 +1,4 @@
-from __future__ import annotations as _annotations
+#from __future__ import annotations as _annotations
 
 import fastapi
 from fastapi.exceptions import RequestValidationError
@@ -11,8 +11,8 @@ import optuna
 from pathlib import Path
 import traceback
 from fastapi.middleware.cors import CORSMiddleware
-# from sqlmodel import Field, Session, SQLModel, create_engine, select, Relationship
-# from typing import Annotated, Optional, List, Mapping
+from sqlmodel import Field, Session, SQLModel, create_engine, select, Relationship
+from typing import Annotated, Optional, List
 
 origins = ['http://localhost:3000', 'http://localhost:8080']
 app = fastapi.FastAPI()
@@ -28,11 +28,26 @@ app.add_middleware(
 
 SECONDS_IN_MINUTE = 60
 
-# def get_session():
-#     with Session(app.state.engine) as session:
-#         yield session
+def get_session():
+    with Session(app.state.engine) as session:
+        yield session
 
-# SessionDep = Annotated[Session, Depends(get_session)]
+SessionDep = Annotated[Session, Depends(get_session)]
+
+class BudgetScenarioSettings(SQLModel, table=True):
+    __tablename__ = "budgetscenariosettings"
+    name: str = Field(primary_key=True)
+    #total_budget: float = Field(default=Field(..., ge=0))
+    budget: List['BudgetSettings'] = Relationship(back_populates="budget_scenario", cascade_delete=True)
+
+class BudgetSettings(SQLModel, table=True):
+    id: int = Field(default=None, primary_key=True)
+    study_name: str = Field(index=True, foreign_key="budgetscenariosettings.name")
+    channel: str = Field(index=True)
+    initial_budget: float
+    lower_bound: float
+    upper_bound: float
+    budget_scenario: BudgetScenarioSettings = Relationship(back_populates="budget")
 
 # class BudgetRangeSetting(SQLModel, table=True):
 #     id: Optional[int] = Field(default=None, primary_key=True)
@@ -101,12 +116,12 @@ def _optimize(url, budget_scenario: BudgetScenario, timeout: int, n_trials:int, 
     optimizer.optimize(
         bounds, constraints=constraints, 
         study_name=budget_scenario.name,
-         n_trials=n_trials, n_jobs=1, 
-         timeout=timeout*SECONDS_IN_MINUTE,
-         load_if_exists=load_if_exists)
+        n_trials=n_trials, n_jobs=1, 
+        timeout=timeout*SECONDS_IN_MINUTE,
+        load_if_exists=load_if_exists)
 
 @app.post("/budget_scenario")
-async def create_budget_scenario(budget_scenario: BudgetScenario): #, session: SessionDep):
+async def create_budget_scenario(budget_scenario: BudgetScenario, session: SessionDep):
     """
     Create a budget scenario
     """
@@ -119,27 +134,37 @@ async def create_budget_scenario(budget_scenario: BudgetScenario): #, session: S
         app.state.RUNNING_PROCESSES[budget_scenario.name] = OptimizerProcess(app.state.database_url, budget_scenario)
         app.state.RUNNING_PROCESSES[budget_scenario.name].start()
 
-        # budget_scenario_db = Scenario(
-        #     name=budget_scenario.name,
-        #     constraints=[BudgetRangeSettings(
-        #         attr_name="total_budget",
-        #         unit="USD",
-        #         lower_bound=budget_scenario.total_budget.lower_bound,
-        #         upper_bound=budget_scenario.total_budget.upper_bound,
-        #         budget_name=budget_scenario.name)])
+        budget_scenario_setting = BudgetScenarioSettings(
+            name=budget_scenario.name,
+            budget=[
+            BudgetSettings(
+                study_name=budget_scenario.name,
+                channel='total_budget',
+                initial_budget=budget_scenario.total_budget.initial_budget,
+                lower_bound=budget_scenario.total_budget.lower_bound,
+                upper_bound=budget_scenario.total_budget.upper_bound
+            ),
+            BudgetSettings(
+                study_name=budget_scenario.name,
+                channel="olv",
+                initial_budget=budget_scenario.olv.initial_budget,
+                lower_bound=budget_scenario.olv.lower_bound,
+                upper_bound=budget_scenario.olv.upper_bound
+            ),
+            BudgetSettings(
+                study_name=budget_scenario.name,
+                channel="paid_search",
+                initial_budget=budget_scenario.paid_search.initial_budget,
+                lower_bound=budget_scenario.paid_search.lower_bound,
+                upper_bound=budget_scenario.paid_search.upper_bound
+            )]
+        )
+       
     
-        # session.add(budget_scenario_db)
-        # session.commit()
-        # for attr_name, attr in budget_scenario.__dict__.items():
-        #     if isinstance(attr, BudgetRange):
-        #         session.add(BudgetRangeSettings(
-        #             attr_name=attr_name,
-        #             unit=attr.unit,
-        #             lower_bound=attr.lower_bound,
-        #             upper_bound=attr.upper_bound,
-        #             budget_name=budget_scenario_name.name))
-        # session.commit()    
-        # session.refresh(budget_scenario_db)
+        session.add(budget_scenario_setting)
+        session.commit()
+         
+        session.refresh(budget_scenario_setting)
     except Exception as e:
         return {"Error": str(e)}
     return {"Optimizer started": budget_scenario.name}
@@ -168,13 +193,17 @@ async def get_budget_scenario(name: str):
         raise HTTPException(status_code=404, detail="Budget scenario not found")
 
 @app.get("/budget_scenario/{name}/settings")
-async def get_budget_scenario_settings(name: str):# session: SessionDep):
+async def get_budget_scenario_settings(name: str, session: SessionDep):
     """
     Get the settings for a budget scenario
     """
-    # scenario = session.get(Scenario, name)
-    # if scenario:
-    #     return scenario
+    scenario = session.get(BudgetScenarioSettings, name, populate_existing=True)
+    settings = session.exec(
+        select(BudgetSettings).where(BudgetSettings.study_name == name)
+    ).all()
+
+    if scenario or settings:
+        return {"scenario": scenario, "channel_settings": settings}
     raise HTTPException(status_code=404, detail="Budget scenario not found")
 
 @app.get("/budget_scenario/{name}/best_trial")
@@ -185,24 +214,24 @@ async def get_best_trial(name: str):
     return {name: optuna.study.load_study(name, storage=app.state.database_url).best_trial}
 
 @app.delete("/budget_scenario/{name}")
-async def delete_budget_scenario(name: str): #, session: SessionDep):
+async def delete_budget_scenario(name: str, session: SessionDep):
     """
     Delete a budget scenario
     """
     try:
         optuna.study.delete_study(study_name=name, storage=app.state.database_url)
 
-        # scenario = session.get(Scenario, name)
-        # if scenario:
-        #     session.delete(scenario)
-        #     session.commit()
+        scenario = session.get(BudgetScenarioSettings, name)
+        if scenario:
+            session.delete(scenario)
+            session.commit()
         return {"Deleted": name}
     except KeyError:
         raise HTTPException(status_code=404, detail="Budget scenario not found")
 
 
-# def create_db_and_tables():
-#     SQLModel.metadata.create_all(engine, checkfirst=False, echo=True)
+def create_db_and_tables():
+    SQLModel.metadata.create_all(engine, checkfirst=False, echo=True)
 
 @app.on_event("startup")
 async def startup():
@@ -213,9 +242,34 @@ async def startup():
     port = os.environ.get("POSTGRES_PORT")
     host = os.environ.get("POSTGRES_HOST")
     app.state.database_url = f"postgresql://{user}:{password}@{host}:{port}/{db}"
-    # connect_args = None #{"check_same_thread": False}
-    # app.state.engine = create_engine(app.state.database_url)
-    # SQLModel.metadata.create_all(app.state.engine)
+    connect_args = {"check_same_thread": False}
+    
+    try:
+        app.state.engine = create_engine(app.state.database_url)
+    except:
+        print("Error connecting to database")
+        import psycopg2
+        from psycopg2 import sql
+        from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT # <-- ADD THIS LINE
+
+        con = psycopg2.connect(
+            user=user, host=host, port=port,
+            password=password)
+        con.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT) # <-- ADD THIS LINE
+
+        cur = con.cursor()
+
+        # Use the psycopg2.sql module instead of string concatenation 
+        # in order to avoid sql injection attacks.
+        cur.execute(sql.SQL("CREATE DATABASE {}").format(
+                sql.Identifier(
+                    db
+                ))
+            )
+        cur.close()
+        con.close()
+        app.state.engine = create_engine(app.state.database_url)
+    SQLModel.metadata.create_all(app.state.engine, checkfirst=True)
     app.state.RUNNING_PROCESSES = {}
 
 @app.on_event("shutdown")

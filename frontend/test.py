@@ -127,12 +127,12 @@ def show_study(study_name):
         except Exception as e:
             st.error("Error processing trial history")
     with tabs[2]:
-        ...
-        # try:
-        #     settings = asyncio.run(get_study_settings(study_name))
-        #     st.write(settings)
-        # except Exception as e:
-        #     st.error("Error processing settings")
+        
+        try:
+            settings = asyncio.run(get_study_settings(study_name))
+            st.write(settings)
+        except Exception as e:
+            st.error("Error processing settings")
        
 
 
