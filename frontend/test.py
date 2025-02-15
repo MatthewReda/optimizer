@@ -4,12 +4,14 @@ from utils.budget_classes import BudgetScenario, ACCEPTED_CHANNELS, Budget
 from utils.study_helpers import (
     get_study, list_studies, 
     delete_study, create_budget_scenario, 
-    get_study_settings, get_prediction)
-from utils.ui import make_radar_chart
+    get_study_settings, get_prediction, Trial)
+from utils.ui import make_radar_chart, make_trial_history_figure
 
 import streamlit as st
 from pydantic import BaseModel, Field, model_validator
 import asyncio
+
+import plotly.graph_objects as go
 
 from streamlit_autorefresh import st_autorefresh
 
@@ -80,6 +82,49 @@ def convert_study(study):
         #print("csv", e)
         return None
 
+@st.cache_data
+def trial_view(
+    best_study: Trial, 
+    initial_budget: dict[str, float], 
+    prediction_with_zero_budget: float, 
+    prediction_with_initial_budget: float
+    ):
+    """Initial Optimizer Overview"""
+
+    ## Format Summary
+    cols = st.columns(3)
+
+    optimal_incremental_revenue = best_study.values[0] - prediction_with_zero_budget
+    initial_incremental_revenue = prediction_with_initial_budget - prediction_with_zero_budget
+
+    total_optimal_budget = sum(best_study.budget.values())
+    total_initial_budget = sum(initial_budget.values())
+
+    initial_roi = initial_incremental_revenue/total_initial_budget
+    optimal_roi = optimal_incremental_revenue/total_optimal_budget
+
+    cols[0].metric(
+        label="Total Budget",
+        value=f"${total_optimal_budget:0.2f}",
+        delta=f"${total_optimal_budget-total_initial_budget:0.2f}",
+        border=True
+    )
+
+    cols[1].metric(
+        label="Inc Revenue", 
+        value=f"${optimal_incremental_revenue:0.2f}", 
+        delta=f"${optimal_incremental_revenue-initial_incremental_revenue:0.2f}",
+        border=True
+        )
+
+    cols[2].metric(
+        label="ROI",
+        value=f"${optimal_roi:.2f}",
+        delta=f"{optimal_roi/initial_roi-1: .1%}",
+        border=True
+
+    )
+
 @st.fragment(run_every=30)
 def show_study(study_name):
     study = asyncio.run(get_study(study_name))
@@ -99,9 +144,10 @@ def show_study(study_name):
         zero_prediction = predict({name: 0 for name in initial_budget.keys()})
         initial_budget = {name: initial_budget[name.lower().replace(" ","_")] for name in ACCEPTED_CHANNELS}
     
-    columns[-1].button("", key=f"{study_name}_delete", type='primary', icon='🗑️', on_click=wrap_delete_study, args=(study_name,))
+    columns[-1].button("Delete", key=f"{study_name}_delete", type='primary', on_click=wrap_delete_study, args=(study_name,))
     columns[-2].button("Refresh", key=f"{study_name}_refresh", on_click=refresh, args=(study_name,), help="Refresh the study")
     best_study = study.best_trial
+
     best_study = best_study if best_study else "No best trial yet"
     if isinstance(best_study, str):
         container.markdown(f"**{best_study}**")
@@ -110,44 +156,16 @@ def show_study(study_name):
     tabs = container.tabs(["Best Trial", "Trial History", "Settings"])
     with tabs[0]:
         try:
-            cols = st.columns([2, 2, 2])
-            opt_inc_rev = best_study.values[0] - zero_prediction
-            initial_inc_rev = initial_prediction - zero_prediction
-            optimal_total_budget = sum(best_study.budget.values())
-            initial_total_budget = sum(initial_budget.values())
-            initial_roi = initial_inc_rev/initial_total_budget
-            optimal_roi = opt_inc_rev/optimal_total_budget
-            cols[0].metric(
-                label="Total Budget",
-                value=f"${optimal_total_budget:0.2f}",
-                delta=f"${optimal_total_budget-initial_total_budget:0.2f}",
-                border=True
+           
+            trial_view(
+                best_study, 
+                initial_budget=initial_budget, 
+                prediction_with_initial_budget=initial_prediction, 
+                prediction_with_zero_budget=zero_prediction
             )
-            cols[1].metric(
-                label="Inc Revenue", 
-                value=f"${opt_inc_rev:0.2f}", 
-                delta=f"${opt_inc_rev-initial_inc_rev:0.2f}",
-                border=True
-                )
-            cols[2].metric(
-                label="ROI",
-                value=f"${optimal_roi:.2f}",
-                delta=f"{optimal_roi/initial_roi-1: .1%}",
-                border=True
 
-            )
-            # st.markdown(
-            #     (
-            #         f"### Revenue: ${best_study.values[0]:,.2f}\t"
-            #         f"Total Budget: {sum(best_study.budget.values()):,.2f}"
-            #     )
-            # )
-    
             if budget := best_study.budget:
                 pyplot = make_radar_chart(initial_budget, budget)
-                #fig, ax = plt.subplots(facecolor='none', figsize=(4, 4))
-                #ax.pie(list(budget.values()), labels=list(budget.keys()), autopct='%1.1f%%', startangle=90)
-                #ax.legend(ncols=2)
                 st.plotly_chart(pyplot, use_container_width=True)
 
             columns[0].download_button('Download', convert_study(study), f'{study_name}_trials.csv', key=f"{study_name}_download", mime='text/csv')
@@ -157,24 +175,48 @@ def show_study(study_name):
     with tabs[1]:
         try:
             revenue = [trial.values[0] for trial in study.trials if trial.completed]
-            best_studys = []
-            best_so_far = 0
-            for trial in study.trials:
-                if not trial.completed:
-                    continue
-                if trial.values[0] > best_so_far:
-                    best_so_far = trial.values[0]
-                best_studys.append(best_so_far)
 
-            index = np.arange(len(revenue))
-            fig, ax = plt.subplots(facecolor='gray', figsize=(4, 4),clear=True)
-            ax.scatter(index, revenue, s=2)
-            ax.plot(index, best_studys, color='red')
-            ax.set_xlabel("Trials")
-            ax.set_ylabel("Revenue")
-            st.pyplot(fig, clear_figure=True)
+            # best_studys = []
+            # best_so_far = 0
+            # for trial in study.trials:
+            #     if not trial.completed:
+            #         continue
+            #     if trial.values[0] > best_so_far:
+            #         best_so_far = trial.values[0]
+            #     best_studys.append(best_so_far)
+
+            # index = np.arange(len(revenue))
+            
+            # fig = go.Figure()
+
+            # fig.add_trace(
+            #     go.Scatter(
+            #         x=index,
+            #         y=revenue,
+            #         mode="markers",
+            #         hovertemplate="Predicted Revenue: $%{y:.0f}",
+            #         name="Trial",
+            #     )
+            # )
+            # fig.add_trace(
+            #     go.Scatter(
+            #         x=index,
+            #         y=best_studys,
+            #         hovertemplate="Predicted Revenue: $%{y:.0f}",
+            #         mode='lines',
+            #         name="Best Value"
+            #     )
+            # )
+            # fig.update_layout(
+            #     title="Trial Progress",
+            #     hovermode="x unified",
+                
+            # )
+            fig = make_trial_history_figure(revenue=revenue)
+            st.plotly_chart(fig, use_container_width=True)
+
         except Exception as e:
-            st.error("Error processing trial history")
+            st.error(f"Error processing trial history {e}")
     with tabs[2]:
         
         try:

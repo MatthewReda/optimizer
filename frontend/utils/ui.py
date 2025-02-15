@@ -1,4 +1,5 @@
 import plotly.graph_objects as go
+import numpy as np
 from typing import Annotated
 
 Budget = Annotated[dict[str, float], "The budget for the scenario."]
@@ -42,6 +43,45 @@ def make_radar_chart(initial_budget:Budget, optimized_budget:Budget) -> go.Figur
             )),
         showlegend=True,
    
+    )
+
+    return fig
+
+def make_trial_history_figure(revenue: list[float]) -> go.Figure:
+    
+    best_studys = []
+    best_so_far = 0
+    for trial in revenue:
+        if trial > best_so_far:
+            best_so_far = trial
+        best_studys.append(best_so_far)
+
+    index = np.arange(len(revenue))
+    
+    fig = go.Figure()
+
+    fig.add_trace(
+        go.Scatter(
+            x=index,
+            y=revenue,
+            mode="markers",
+            hovertemplate="Predicted Revenue: $%{y:.0f}",
+            name="Trial",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=index,
+            y=best_studys,
+            hovertemplate="Predicted Revenue: $%{y:.0f}",
+            mode='lines',
+            name="Best Value"
+        )
+    )
+    fig.update_layout(
+        title="Trial Progress",
+        hovermode="x unified",
+        
     )
 
     return fig
