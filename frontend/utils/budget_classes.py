@@ -30,7 +30,14 @@ class ChannelBudget(BaseModel):
         if (self.lower_bound > self.upper_bound):
             raise ValueError("The lower bound must be less than or equal to the upper bound.")
         return self
-    
+
+Budget = create_model(
+    "Budget", 
+    **{
+        channel.lower().replace(" ", "_"): (float, Field(..., description="Spend for this channel", ge=0)) 
+        for channel in ACCEPTED_CHANNELS
+    }
+    )
 
 BUDGET_FIELDS = (
     {

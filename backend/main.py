@@ -4,7 +4,7 @@ import fastapi
 from fastapi.exceptions import RequestValidationError
 from fastapi import HTTPException, Depends
 import asyncpg
-from utils.budget_classes import BudgetScenario, ACCEPTED_CHANNELS
+from utils.budget_classes import BudgetScenario, ACCEPTED_CHANNELS, Budget
 from model_settings.optimizer import revenue_model, create_optimizer
 import multiprocessing as mp
 import optuna
@@ -47,24 +47,7 @@ class BudgetSettings(SQLModel, table=True):
     initial_budget: float
     lower_bound: float
     upper_bound: float
-    budget_scenario: BudgetScenarioSettings = Relationship(back_populates="budget")
-
-# class BudgetRangeSetting(SQLModel, table=True):
-#     id: Optional[int] = Field(default=None, primary_key=True)
-#     attr_name: str
-#     unit: str
-#     lower_bound: float
-#     upper_bound: float
-#     budget_name: str|None = Field(foreign_key="scenario.name", index=True)
-
-# class Scenario(SQLModel, table=True):
-#     name: str = Field(primary_key=True)
-#     constraints: List[BudgetRangeSetting] = Relationship(back_populates="scenario")
-    
-
-# class ScenarioConfig(Scenario):
-#     name: str
-    
+    budget_scenario: BudgetScenarioSettings = Relationship(back_populates="budget")    
 
 class OptimizerProcess(mp.Process):
     def __init__(self, url: str, budget_scenario: BudgetScenario, *args, **kwargs):
@@ -225,6 +208,16 @@ async def delete_budget_scenario(name: str, session: SessionDep):
     except KeyError:
         raise HTTPException(status_code=404, detail="Budget scenario not found")
 
+@app.post("/predict")
+async def predict_budget(budget: Budget):
+    budget_dict = {
+        channel: getattr(budget, channel.lower().replace(" ", "_")) for channel in ACCEPTED_CHANNELS
+    }
+    
+    prediction: float = revenue_model.predict(budget_dict).sum(...).item()
+
+    return {"prediction": prediction}
+    
 
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine, checkfirst=False, echo=True)

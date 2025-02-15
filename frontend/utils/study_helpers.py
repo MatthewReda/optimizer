@@ -2,8 +2,12 @@ import httpx
 from dataclasses import dataclass
 import numpy as np
 from dotenv import load_dotenv
-from utils.budget_classes import BudgetScenario
+from utils.budget_classes import BudgetScenario, Budget
 import os
+from typing import TypedDict
+
+class PredictionResponse(TypedDict):
+    prediction: float
 
 load_dotenv()
 
@@ -132,7 +136,6 @@ async def delete_study(study_name:str, url: str=URL) -> None:
 
 async def create_budget_scenario(data: BudgetScenario, url: str = URL) -> None:
     try:
-        print(data.model_dump_json(by_alias=True))
         async with httpx.AsyncClient() as client:
             response = await client.post(url, json=data.model_dump(by_alias=True))
         response.raise_for_status()
@@ -149,3 +152,21 @@ async def create_budget_scenario(data: BudgetScenario, url: str = URL) -> None:
         print(f"An error occurred: {exc}")
         return None
 
+async def get_prediction(budget: Budget, url: str="http://127.0.0.1:8000/predict") -> PredictionResponse|None:
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, json=budget.model_dump(by_alias=True))
+        response.raise_for_status()
+        return response.json()
+    except httpx.RequestError as exc:
+        print(f"A request error occurred: {exc}")
+        return None
+    except httpx.TimeoutException as exc:
+        print(f"A timeout error occurred: {exc}")
+        return None
+    except httpx.HTTPStatusError as exc:
+        print(f"A HTTP status error occurred: {exc}")
+        return None
+    except httpx.HTTPError as exc:
+        print(f"An error occurred: {exc}")
+        return None

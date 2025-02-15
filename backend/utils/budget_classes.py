@@ -10,7 +10,13 @@ class Unit(StrEnum):
     MILLION = "$MM"
     THOUSAND = "$K"
 
-
+Budget = create_model(
+    "Budget", 
+    **{
+        channel.lower().replace(" ", "_"): (float, Field(..., description="Spend for this channel", ge=0)) 
+        for channel in ACCEPTED_CHANNELS
+    }
+    )
 
 class ChannelBudget(BaseModel):
     
