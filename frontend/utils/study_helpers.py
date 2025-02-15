@@ -65,7 +65,7 @@ async def get_study(study_name:str, url: str = URL) -> Study:
     
     return process_study(response.json())
 
-async def get_study_settings(study_name:str, url: str = URL) -> Study:
+async def get_study_settings(study_name:str, url: str = URL):
 
     formated_url = f"{url}/{study_name}/settings"
     try:
@@ -148,3 +148,4 @@ async def create_budget_scenario(data: BudgetScenario, url: str = URL) -> None:
     except httpx.HTTPError as exc:
         print(f"An error occurred: {exc}")
         return None
+

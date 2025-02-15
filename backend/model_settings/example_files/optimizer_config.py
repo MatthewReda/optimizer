@@ -17,7 +17,7 @@ def loss_fn(x: xr.DataArray, start_date=None, end_date=None, dim="Period"):
 def optimizer_array_to_budget(array: np.ndarray) -> BudgetType:
     initial_budget: BudgetType = CONFIG['initial_budget']
     budget: BudgetType = {}
-        
+    
     for i, key in enumerate(initial_budget.keys()):
         budget[key] = array[i]
     return budget

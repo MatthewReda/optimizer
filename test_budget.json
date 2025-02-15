@@ -1,19 +1,34 @@
 {
-    "name": "Test File",
-    "Online Video": {
+    "name": "Test File 1",
+    "OLV": {
         "unit": "$K",
-        "lower_bound": 2,
-        "upper_bound": 8
+        "initial_budget": 10,
+        "lower_bound": 5,
+        "upper_bound": 15
     },
     "Paid Search": {
         "unit": "$K",
-        "lower_bound": 2,
-        "upper_bound": 8
+        "initial_budget": 10,
+        "lower_bound": 5,
+        "upper_bound": 15
+    },
+    "Print": {
+        "unit": "$K",
+        "initial_budget": 10,
+        "lower_bound": 5,
+        "upper_bound": 15
+    },
+    "Radio":{
+        "unit": "$K",
+        "initial_budget": 10,
+        "lower_bound": 5,
+        "upper_bound": 15
     },
     "Total Budget": {
         "unit": "$K",
-        "lower_bound": 10,
-        "upper_bound": 10
+        "initial_budget": 40,
+        "lower_bound": 40,
+        "upper_bound": 40
     },
     "timout": 10,
     "n_trials": 500

@@ -4,7 +4,7 @@ import fastapi
 from fastapi.exceptions import RequestValidationError
 from fastapi import HTTPException, Depends
 import asyncpg
-from utils.budget_classes import BudgetScenario
+from utils.budget_classes import BudgetScenario, ACCEPTED_CHANNELS
 from model_settings.optimizer import revenue_model, create_optimizer
 import multiprocessing as mp
 import optuna
@@ -71,7 +71,7 @@ class OptimizerProcess(mp.Process):
         mp.Process.__init__(self, *args, **kwargs)
         self.daemon = True
         self.budget_scenario = budget_scenario
-        self.timeout = budget_scenario.timout
+        self.timeout = budget_scenario.timeout
         self.n_trials = budget_scenario.n_trials
         self.url = url
         self._pconn, self._cconn = mp.Pipe()
@@ -110,9 +110,11 @@ def _optimize(url, budget_scenario: BudgetScenario, timeout: int, n_trials:int, 
     config_path = Path(__file__).parent/"model_settings/example_files"
     optimizer = create_optimizer(url, config_path)
     bounds = {
-        "a": (budget_scenario.olv.lower_bound, budget_scenario.olv.upper_bound), 
-        "b": (budget_scenario.paid_search.lower_bound, budget_scenario.paid_search.upper_bound)}
+        channel: (getattr(budget_scenario, channel.lower().replace(" ", "_")).lower_bound, getattr(budget_scenario, channel.lower().replace(" ", "_")).upper_bound) for channel in ACCEPTED_CHANNELS
+    }
+
     constraints = (budget_scenario.total_budget.lower_bound, budget_scenario.total_budget.upper_bound)
+    print(bounds, constraints)
     optimizer.optimize(
         bounds, constraints=constraints, 
         study_name=budget_scenario.name,
@@ -126,6 +128,7 @@ async def create_budget_scenario(budget_scenario: BudgetScenario, session: Sessi
     Create a budget scenario
     """
     try:
+        print(budget_scenario)
         if budget_scenario.name in optuna.study.get_all_study_names(storage=app.state.database_url):
             raise HTTPException(status_code=400, detail="Budget scenario already exists")
         if budget_scenario.name in app.state.RUNNING_PROCESSES:
@@ -143,21 +146,14 @@ async def create_budget_scenario(budget_scenario: BudgetScenario, session: Sessi
                 initial_budget=budget_scenario.total_budget.initial_budget,
                 lower_bound=budget_scenario.total_budget.lower_bound,
                 upper_bound=budget_scenario.total_budget.upper_bound
-            ),
+            )] + [
             BudgetSettings(
                 study_name=budget_scenario.name,
-                channel="olv",
-                initial_budget=budget_scenario.olv.initial_budget,
-                lower_bound=budget_scenario.olv.lower_bound,
-                upper_bound=budget_scenario.olv.upper_bound
-            ),
-            BudgetSettings(
-                study_name=budget_scenario.name,
-                channel="paid_search",
-                initial_budget=budget_scenario.paid_search.initial_budget,
-                lower_bound=budget_scenario.paid_search.lower_bound,
-                upper_bound=budget_scenario.paid_search.upper_bound
-            )]
+                channel=channel.lower().replace(" ", "_"),
+                initial_budget=getattr(budget_scenario, channel.lower().replace(" ", "_")).initial_budget,
+                lower_bound=getattr(budget_scenario, channel.lower().replace(" ", "_")).lower_bound,
+                upper_bound=getattr(budget_scenario, channel.lower().replace(" ", "_")).upper_bound
+            ) for channel in ACCEPTED_CHANNELS]
         )
        
     

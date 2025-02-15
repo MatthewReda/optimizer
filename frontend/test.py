@@ -2,6 +2,7 @@ from enum import StrEnum
 from typing import Set
 from utils.budget_classes import BudgetScenario
 from utils.study_helpers import get_study, list_studies, delete_study, create_budget_scenario, get_study_settings
+from utils.ui import make_radar_chart
 
 import streamlit as st
 from pydantic import BaseModel, Field, model_validator
@@ -76,7 +77,11 @@ def show_study(study_name):
     container = st.container(key=f"{study_name}_container", border=True, height=800)
     container.markdown(f"### {study_name}")
     columns = container.columns(5)
-    
+    study_settings = asyncio.run(get_study_settings(study_name))
+    study_settings = study_settings if study_settings else {}
+    if study_settings:
+        intitial_budget = {channel_setting['channel']: channel_setting['initial_budget'] for channel_setting in study_settings['channel_settings']}
+        
     columns[-1].button("", key=f"{study_name}_delete", type='primary', icon='🗑️', on_click=wrap_delete_study, args=(study_name,))
     columns[-2].button("Refresh", key=f"{study_name}_refresh", on_click=refresh, args=(study_name,), help="Refresh the study")
     best_study = study.best_trial
@@ -96,11 +101,11 @@ def show_study(study_name):
             )
     
             if budget := best_study.budget:
-        
-                fig, ax = plt.subplots(facecolor='none', figsize=(4, 4))
-                ax.pie([budget['a'], budget['b']], labels=['Online Video', 'Paid Search'], autopct='%1.1f%%', startangle=90)
-                ax.legend(ncols=2)
-                st.pyplot(fig, clear_figure=True)
+                pyplot = make_radar_chart(intitial_budget, budget)
+                #fig, ax = plt.subplots(facecolor='none', figsize=(4, 4))
+                #ax.pie(list(budget.values()), labels=list(budget.keys()), autopct='%1.1f%%', startangle=90)
+                #ax.legend(ncols=2)
+                st.plotly_chart(pyplot, use_container_width=True)
 
             columns[0].download_button('Download', convert_study(study), f'{study_name}_trials.csv', key=f"{study_name}_download", mime='text/csv')
         except Exception as e:
