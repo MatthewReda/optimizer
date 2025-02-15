@@ -1,14 +1,19 @@
 from enum import StrEnum
-from typing import Set
+from typing import Set, Literal, List
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, create_model
 
+
+ACCEPTED_CHANNELS = ["OLV", "Paid Search", "Print", "Radio"]
 
 class Unit(StrEnum):
     MILLION = "$MM"
     THOUSAND = "$K"
 
-class BudgetRange(BaseModel):
+
+
+class ChannelBudget(BaseModel):
+    
     unit: Unit = Field(Unit.THOUSAND, description="The unit of the budget range.")
     initial_budget: float = Field(
         ..., description="The initial budget for this channel.", ge=0
@@ -27,27 +32,33 @@ class BudgetRange(BaseModel):
         return self
     
 
-class BudgetScenario(BaseModel):
-    
-    name: str = Field(
-        ..., description="Please enter a descriptive name for this budget scenario", min_length=1
-    )
-    olv: BudgetRange = Field(
-        ...,
-        alias="Online Video",
-        description="Please enter the budget range for OLV."
-    )
-    paid_search: BudgetRange = Field(
-        ...,
-        alias="Paid Search",
-        description="Please enter the budget range for OLV."
-    )
-    total_budget: BudgetRange = Field(
-        ...,
-        alias="Total Budget",
-        description="Please enter the total budget."
-    )
+BUDGET_FIELDS = (
+    {
+    "name": (str, Field(..., description="Please enter a descriptive name for this budget scenario", min_length=1)),
+    } | {
+    channel.lower().replace(" ", "_"): (ChannelBudget, Field(..., description=f"Please enter the budget range for {channel}.", alias=channel)) for channel in ACCEPTED_CHANNELS+["Total Budget"]
+    } | {
+    "timeout": (int, Field(60, description="The max time for the optimizer in seconds.")),
+    "n_trials": (int, Field(1000, description="The max number of trials for the optimizer."))
+    }
+)
 
-    timout: int = Field(60, description="The max time for the optimizer in seconds.")
-    n_trials: int = Field(1000, description="The max number of trials for the optimizer.")
+BudgetScenario = create_model(
+    "BudgetScenario",
+    **BUDGET_FIELDS
+)
+
+# class BudgetScenario(BaseModel):
+    
+#     name: str = Field(
+#         ..., description="Please enter a descriptive name for this budget scenario", min_length=1
+#     )
+    
+#     channel_budgets: List[ChannelBudget] = Field(
+#         ..., description="The budget ranges for each channel.",
+#         min_length=3, max_length=3
+#     )
+
+#     timout: int = Field(60, description="The max time for the optimizer in seconds.")
+#     n_trials: int = Field(1000, description="The max number of trials for the optimizer.")
    

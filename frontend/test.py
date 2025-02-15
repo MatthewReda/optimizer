@@ -70,6 +70,7 @@ def convert_study(study):
 def show_study(study_name):
     study = asyncio.run(get_study(study_name))
     if not study:
+        sleep(5)
         st.rerun()
         return
     container = st.container(key=f"{study_name}_container", border=True, height=800)
