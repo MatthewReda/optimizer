@@ -225,8 +225,8 @@ def create_db_and_tables():
 @app.on_event("startup")
 async def startup():
     import os
-    user = os.environ.get("POSTGRES_USER")
-    password = os.environ.get("POSTGRES_PASSWORD")
+    user = os.environ.get("POSTGRES_USER", 'postgres')
+    password = os.environ.get("POSTGRES_PASSWORD", 'postgres')
     db = os.environ.get("POSTGRES_DB")
     port = os.environ.get("POSTGRES_PORT")
     host = os.environ.get("POSTGRES_HOST")
