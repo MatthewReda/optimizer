@@ -11,7 +11,7 @@ class PredictionResponse(TypedDict):
 
 load_dotenv()
 
-URL = os.environ.get("POSTGRES_CONNECTION", "http://127.0.0.1:8000/budget_scenario")
+URL = os.environ.get("POSTGRES_CONNECTION", "http://host.docker.internal:8000/budget_scenario")
 
 
 @dataclass
@@ -152,7 +152,7 @@ async def create_budget_scenario(data: BudgetScenario, url: str = URL) -> None:
         print(f"An error occurred: {exc}")
         return None
 
-async def get_prediction(budget: Budget, url: str="http://127.0.0.1:8000/predict") -> PredictionResponse|None:
+async def get_prediction(budget: Budget, url: str="http://host.docker.internal:8000/predict") -> PredictionResponse|None:
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(url, json=budget.model_dump(by_alias=True))
