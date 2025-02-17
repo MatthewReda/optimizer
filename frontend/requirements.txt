@@ -68,6 +68,7 @@ MarkupSafe==3.0.2
 matplotlib==3.10.0
 matplotlib-inline==0.1.7
 mdurl==0.1.2
+millify==0.1.1
 miniKanren==1.0.3
 ml_dtypes==0.5.1
 multipledispatch==1.0.0

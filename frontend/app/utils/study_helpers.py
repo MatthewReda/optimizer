@@ -6,12 +6,16 @@ from utils.budget_classes import BudgetScenario, Budget
 import os
 from typing import TypedDict
 
+
 class PredictionResponse(TypedDict):
     prediction: float
 
+
 load_dotenv()
 
-URL = os.environ.get("POSTGRES_CONNECTION", "http://host.docker.internal:8000/budget_scenario")
+BASE_URL = os.environ.get("POSTGRES_CONNECTION", "http://host.docker.internal:8000")
+BUDGET_URL = f"{BASE_URL}/budget_scenarios"
+PREDICTION_URL = f"{BASE_URL}/predict"
 
 
 @dataclass
@@ -20,6 +24,7 @@ class Trial:
     values: list[float]
     completed: bool
 
+
 @dataclass
 class Study:
     name: str
@@ -27,26 +32,35 @@ class Study:
 
     @property
     def best_trial(self):
-        if len(self.trials)<1:
+        if len(self.trials) < 1:
             return None
-        return sorted(self.trials, key=lambda x: x.values[0] if x.completed else -np.inf)[-1]
+        return sorted(
+            self.trials, key=lambda x: x.values[0] if x.completed else -np.inf
+        )[-1]
+
 
 def process_study(study: dict[str, list[dict[str, any]]]) -> Study:
     """Process the response from the API to a study object"""
-    
+
     assert len(study.keys()) == 1, "Only one study is allowed"
-    name = list(study.keys())[0]  
+    name = list(study.keys())[0]
     trial_objects = []
     try:
-        for trial in  study[name]:
-            trial_objects.append(Trial(budget=trial['_user_attrs']['budget'],values=trial['_values'], completed=trial['state'] == 1))
+        for trial in study[name]:
+            trial_objects.append(
+                Trial(
+                    budget=trial["_user_attrs"]["budget"],
+                    values=trial["_values"],
+                    completed=trial["state"] == 1,
+                )
+            )
     except KeyError:
         print("Error processing study")
         return Study(name=name, trials=[Trial(budget={}, values=[], completed=False)])
     return Study(name=name, trials=trial_objects)
 
-async def get_study(study_name:str, url: str = URL) -> Study:
 
+async def get_study(study_name: str, url: str = BUDGET_URL) -> Study:
     formated_url = f"{url}/{study_name}"
     try:
         async with httpx.AsyncClient() as client:
@@ -66,11 +80,11 @@ async def get_study(study_name:str, url: str = URL) -> Study:
     except httpx.HTTPError as exc:
         print(f"An error occurred: {exc}")
         return None
-    
+
     return process_study(response.json())
 
-async def get_study_settings(study_name:str, url: str = URL):
 
+async def get_study_settings(study_name: str, url: str = BUDGET_URL):
     formated_url = f"{url}/{study_name}/settings"
     try:
         async with httpx.AsyncClient() as client:
@@ -90,10 +104,11 @@ async def get_study_settings(study_name:str, url: str = URL):
     except httpx.HTTPError as exc:
         print(f"An error occurred: {exc}")
         return None
-    
-    return (response.json())
-   
-async def list_studies(url: str = URL) -> list[str]:
+
+    return response.json()
+
+
+async def list_studies(url: str = BUDGET_URL) -> list[str]:
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(url)
@@ -110,10 +125,11 @@ async def list_studies(url: str = URL) -> list[str]:
     except httpx.HTTPError as exc:
         print(f"An error occurred: {exc}")
         return None
-    
-    return response.json()['budget_scenarios']
 
-async def delete_study(study_name:str, url: str=URL) -> None:
+    return response.json()["budget_scenarios"]
+
+
+async def delete_study(study_name: str, url: str = BUDGET_URL) -> None:
     formated_url = f"{url}/{study_name}"
     try:
         async with httpx.AsyncClient() as client:
@@ -134,7 +150,8 @@ async def delete_study(study_name:str, url: str=URL) -> None:
         print(f"An error occurred: {exc}")
         return None
 
-async def create_budget_scenario(data: BudgetScenario, url: str = URL) -> None:
+
+async def create_budget_scenario(data: BudgetScenario, url: str = BUDGET_URL) -> None:
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(url, json=data.model_dump(by_alias=True))
@@ -152,7 +169,10 @@ async def create_budget_scenario(data: BudgetScenario, url: str = URL) -> None:
         print(f"An error occurred: {exc}")
         return None
 
-async def get_prediction(budget: Budget, url: str="http://host.docker.internal:8000/predict") -> PredictionResponse|None:
+
+async def get_prediction(
+    budget: Budget, url: str = PREDICTION_URL
+) -> PredictionResponse | None:
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(url, json=budget.model_dump(by_alias=True))
