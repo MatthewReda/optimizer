@@ -1,7 +1,7 @@
 import httpx
 from dataclasses import dataclass
 import numpy as np
-from dotenv import load_dotenv
+#from dotenv import load_dotenv
 from utils.budget_classes import BudgetScenario, Budget
 import os
 from typing import TypedDict
@@ -11,7 +11,7 @@ class PredictionResponse(TypedDict):
     prediction: float
 
 
-load_dotenv()
+#load_dotenv()
 
 BASE_URL = os.environ.get("POSTGRES_CONNECTION", "http://host.docker.internal:8000")
 BUDGET_URL = f"{BASE_URL}/budget_scenario"

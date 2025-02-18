@@ -1,6 +1,7 @@
 # from __future__ import annotations as _annotations
 
 import fastapi
+import os
 from fastapi import HTTPException, Depends
 from utils.budget_classes import BudgetScenario, ACCEPTED_CHANNELS, Budget
 from model_settings.optimizer import revenue_model, create_optimizer
@@ -11,8 +12,15 @@ import traceback
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Field, Session, SQLModel, create_engine, select, Relationship
 from typing import Annotated, List
+from dotenv import load_dotenv
 
-origins = ["http://localhost:3000", "http://localhost:8080"]
+load_dotenv()
+
+origins = ["http://localhost:8000", "http://localhost:8080", "http://docker.host.internal:8000", "http://0.0.0.0:8000"]
+
+if os.environ.get("ALLOWED_ORIGINS", None):
+    origins = os.environ.get("ALLOWED_ORIGINS").split(",")
+
 app = fastapi.FastAPI()
 
 app.add_middleware(

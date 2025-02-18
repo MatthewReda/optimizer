@@ -20,7 +20,7 @@ COPY /utils /app/utils
 COPY /main.py /app/main.py
 ENV POSTGRES_DB=budget_optimizer
 ENV POSTGRES_HOST=postgress_server
-ENV POSTGRES_PORT=5432
+ENV POSTGRES_PORT=54320
 
 EXPOSE 8000
 
