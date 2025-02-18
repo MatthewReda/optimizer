@@ -1,6 +1,7 @@
 import plotly.graph_objects as go
 import numpy as np
 from typing import Annotated
+from utils.study_helpers import Study, Trial
 
 Budget = Annotated[dict[str, float], "The budget for the scenario."]
 
@@ -89,6 +90,62 @@ def make_trial_history_figure(revenue: list[float]) -> go.Figure:
     fig.update_layout(
         title="Trial Progress",
         hovermode="x unified",
+    )
+
+    return fig
+
+def make_parallel_coordinates_plot(study: Study) -> go.Figure:
+    """Make a parallel coordinates plot of the study"""
+    if len(study.trials) < 1:
+        return go.Figure()
+
+    categories = [key for key in study.trials[0].budget.keys() if "total" not in key.lower()]
+    trials = [trial for trial in study.trials if trial.completed]
+    if len(trials) < 1:
+        return go.Figure()
+
+    data = []
+    for trial in trials:
+        data.append([trial.budget[cat] for cat in categories] + trial.values)
+
+    fig = go.Figure(
+        data=[
+            go.Parcoords(
+                line=dict(
+                    color=[trial.values[0] for trial in trials],
+                    colorscale="blues",
+                    showscale=True,),
+                dimensions=[
+                    dict(
+                        label=cat,
+                        values=[trial.budget[cat] for trial in trials],
+                        range=[np.floor(min([trial.budget[cat] for trial in trials])), np.ceil(max([trial.budget[cat] for trial in trials]))],
+                    )
+                    for cat in categories
+                ]
+                + [
+                    dict(
+                        label="Revenue",
+                        values=[trial.values[0] for trial in trials],
+                        range=[np.floor(min([trial.values[0] for trial in trials])), np.ceil(max([trial.values[0] for trial in trials]))],
+                    )
+                ],
+            )
+        ],
+
+    )
+
+    fig.update_layout(
+        title="Parallel Coordinates Plot",
+        coloraxis_colorbar=dict(
+            title=dict(text="Revenue"),
+            thicknessmode="pixels", thickness=50,
+            lenmode="pixels", len=200,
+            yanchor="top", y=1,
+            ticks="outside", tickprefix="$ ",
+            dtick=5
+        ),
+        showlegend=True,
     )
 
     return fig

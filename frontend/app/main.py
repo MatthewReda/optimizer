@@ -7,8 +7,9 @@ from utils.study_helpers import (
     get_study_settings,
     get_prediction,
     Trial,
+    Study
 )
-from utils.ui import make_radar_chart, make_trial_history_figure
+from utils.ui import make_radar_chart, make_trial_history_figure, make_parallel_coordinates_plot
 
 import streamlit as st
 import asyncio
@@ -87,6 +88,20 @@ def convert_study(study):
         # print("csv", e)
         return None
 
+@st.cache_data
+def cached_radar_chart(
+    initial_budget: dict[str, float], 
+    optimal_budget: dict[str, float]
+):
+    return make_radar_chart(initial_budget, optimal_budget)
+
+@st.cache_data
+def cached_trial_history_figure(revenue: list[float]):
+    return make_trial_history_figure(revenue=revenue)
+
+@st.cache_resource
+def cached_parallel_coordinates_plot(study: Study):
+    return make_parallel_coordinates_plot(study)
 
 @st.cache_data
 def trial_view(
@@ -200,12 +215,12 @@ def show_study(study_name):
     )
 
     ## Additional study information
-    tabs = container.tabs(["Best Trial", "Trial History", "Settings"])
+    tabs = container.tabs(["Best Trial", "Budget Trials", "Trial History", "Settings"])
     with tabs[0]:
         ## Display radar chart to compare budget allocations
         try:
             if budget := best_study.budget:
-                pyplot = make_radar_chart(initial_budget, budget)
+                pyplot = cached_radar_chart(initial_budget, budget)
                 st.plotly_chart(pyplot, use_container_width=True)
 
             columns[0].download_button(
@@ -217,17 +232,26 @@ def show_study(study_name):
             )
         except Exception:
             st.error("Error processing best trial")
-
     with tabs[1]:
+
+        try:
+            ## Display parallel coordinates plot to compare budget allocations
+            fig = cached_parallel_coordinates_plot(study)
+            st.plotly_chart(fig, use_container_width=False, theme=None)
+
+        except ValueError:
+            st.error("Error processing budget trials")
+
+    with tabs[2]:
         ## Optimizer history for
         try:
             revenue = [trial.values[0] for trial in study.trials if trial.completed]
-            fig = make_trial_history_figure(revenue=revenue)
+            fig = cached_trial_history_figure(revenue=revenue)
             st.plotly_chart(fig, use_container_width=True)
 
         except Exception as e:
             st.error(f"Error processing trial history {e}")
-    with tabs[2]:
+    with tabs[3]:
         try:
             initial_df = pd.DataFrame(data=initial_budget, index=["Initial Budget"])
             initial_df["Total"] = initial_df.sum(axis=1)
