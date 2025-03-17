@@ -13,7 +13,7 @@ class PredictionResponse(TypedDict):
 
 #load_dotenv()
 
-BASE_URL = os.environ.get("POSTGRES_CONNECTION", "http://host.docker.internal:8000")
+BASE_URL = os.environ.get("POSTGRES_CONNECTION", "http://localhost:8000")
 BUDGET_URL = f"{BASE_URL}/budget_scenario"
 PREDICTION_URL = f"{BASE_URL}/predict"
 

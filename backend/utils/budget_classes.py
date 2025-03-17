@@ -11,7 +11,7 @@ class Unit(StrEnum):
     THOUSAND = "$K"
 
 
-Budget = create_model(
+Budget: BaseModel = create_model(
     "Budget",
     **{
         channel.lower().replace(" ", "_"): (
@@ -78,4 +78,4 @@ BUDGET_FIELDS = (
     }
 )
 
-BudgetScenario = create_model("BudgetScenario", **BUDGET_FIELDS)
+BudgetScenario: BaseModel = create_model("BudgetScenario", **BUDGET_FIELDS)

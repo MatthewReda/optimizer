@@ -1,3 +1,12 @@
+# Frontend for budget optimization tool
+from time import sleep
+import asyncio
+import json
+
+import streamlit as st
+import streamlit_pydantic as sp
+import pandas as pd
+
 from utils.budget_classes import BudgetScenario, ACCEPTED_CHANNELS, Budget
 from utils.study_helpers import (
     get_study,
@@ -11,14 +20,11 @@ from utils.study_helpers import (
 )
 from utils.ui import make_radar_chart, make_trial_history_figure, make_parallel_coordinates_plot
 
-import streamlit as st
-import asyncio
 
 
-import streamlit_pydantic as sp
-import pandas as pd
-from time import sleep
-import json
+
+
+
 
 
 st.set_page_config(layout="wide", page_title="Budget Scenario Optimizer")
@@ -32,6 +38,8 @@ st.title("Budget Scenario Planner")
 
 if "studies" not in st.session_state:
     st.session_state.studies = asyncio.run(list_studies())
+    if st.session_state.studies is None:
+        st.session_state.studies = []
 
 if not user_validator():
     st.error("You are not authorized to use this app.")

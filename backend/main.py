@@ -1,24 +1,25 @@
 # from __future__ import annotations as _annotations
-
-import fastapi
 import os
-from fastapi import HTTPException, Depends
-from utils.budget_classes import BudgetScenario, ACCEPTED_CHANNELS, Budget
-from model_settings.optimizer import revenue_model, create_optimizer
-import multiprocessing as mp
-import optuna
 from pathlib import Path
 import traceback
+import multiprocessing as mp
+from typing import Annotated, List
+
+import fastapi
+from fastapi import HTTPException, Depends
+from model_settings.optimizer import revenue_model, create_optimizer
+import optuna
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Field, Session, SQLModel, create_engine, select, Relationship
-from typing import Annotated, List
 from dotenv import load_dotenv
+
+from utils.budget_classes import BudgetScenario, ACCEPTED_CHANNELS, Budget
 
 load_dotenv()
 
 origins = ["http://localhost:8000", "http://localhost:8080", "http://docker.host.internal:8000", "http://0.0.0.0:8000"]
 
-if os.environ.get("ALLOWED_ORIGINS", None):
+if os.environ.get("ALLOWED_ORIGINS", ""):
     origins = os.environ.get("ALLOWED_ORIGINS").split(",")
 
 app = fastapi.FastAPI()
@@ -289,10 +290,10 @@ async def startup():
     import os
 
     user = os.environ.get("POSTGRES_USER", "postgres")
-    password = os.environ.get("POSTGRES_PASSWORD", "postgres")
-    db = os.environ.get("POSTGRES_DB")
-    port = os.environ.get("POSTGRES_PORT")
-    host = os.environ.get("POSTGRES_HOST")
+    password = os.environ.get("POSTGRES_PASSWORD", "h!ggsb0s0n")
+    db = os.environ.get("POSTGRES_DB", "optimizer")
+    port = os.environ.get("POSTGRES_PORT", 5432)
+    host = os.environ.get("POSTGRES_HOST", 'localhost')
     app.state.database_url = f"postgresql://{user}:{password}@{host}:{port}/{db}"
 
     try:
